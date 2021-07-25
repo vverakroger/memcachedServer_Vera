@@ -18,20 +18,20 @@ Storage commands:
 
 # Installation
 
-This is what you need to do to install the program is:
+This is what you need to do to install the program:
 
 1. Install Ruby on Rails https://rubyonrails.org/
 2. Download and unzip the .zipfile or clone the repository url on your computer
 
 # Run
 
-1. Open two command prompt and go to your proyect folder in both
+1. Open two command prompt and go to your project folder in both
 2. Run ruby server.rb in one of them to start the server
-3. Once the server is listenig run ruby client.rb in the other to start the client
+3. Once the server is listening run ruby client.rb in the other to start the client
 
 # Authentication
 
-The client needs to enter a user name (string) and a password (abc123). If the password is incorrect the connection ends.
+The client needs to enter an user name (string) and a password (abc123). If the password is incorrect the connection ends.
 If the authentication is correct the client is ready to run the previous mentioned Memcached commands.
 
 # Testing
