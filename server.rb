@@ -18,6 +18,7 @@ class Server
       i = searchKey(aName,aKey)
       result = serv_data[i].values[0]
       if i != '' then
+         updateLastGet(i)
          return "VALUE #{result.values[0][0]} #{result.keys[0]} #{result.values[0][1]} #{result.values[0][2]} #{result.values[0][3]}"
       else
          return "VALUE"
@@ -32,6 +33,7 @@ class Server
       while j < aKeyArray.length do
          i = searchKey(aName,aKeyArray[j])
          if i != '' then
+            updateLastGet(i)
             subResult = serv_data[i].values[0]
             result[cont] = "VALUE #{subResult.values[0][0]} #{subResult.keys[0]} #{subResult.values[0][1]} #{subResult.values[0][2]} #{subResult.values[0][3]}"
          else
@@ -99,11 +101,25 @@ class Server
          returnStorage(reply,false)
       end
    end
-   #
-   def cas()
-      #code
+   # Set the data if it is not updated since last fetch
+   def cas(aName,aDataArray,aValue,reply)
+      i = searchKey(aName,aDataArray[1])
+      if i != '' then
+         if serv_data[i].values[0].values[0][4] < serv_data[i].values[0].values[0][5] then
+            updateKey(aName,aDataArray,nowValue,i)
+            returnStorage(reply,true)
+         else
+            returnStorage(reply,false)
+         end
+      else
+         returnStorage(reply,false)
+      end
    end
-# PRIVATES FUNCTIONS   
+# SUB FUNCTIONS  
+   # Actalice last fetch
+   def setLastFetch(aTime)
+      last_fetch = aTime
+   end
    # Searchs for an especific key and username
    #returns de key index of server_data
    #if empty returns ''
@@ -120,16 +136,27 @@ class Server
       end
       return result
    end
-   # Inserts a new key
+   # Inserts a new key 
+   #{"user"=>{"key"=>["value", "flag", "expTime","bytes", "lastSet", "lastGet"]}}
    private def insertKey(aName,aDataArray,aValue)
-      hash1 = {aDataArray[1] => [aValue.chop,aDataArray[2],aDataArray[3],aDataArray[4]]}
+      lastSet = Time.now
+      expTime = lastSet - aDataArray[3].to_i*60
+      hash1 = {aDataArray[1] => [aValue.chop,aDataArray[2],expTime,aDataArray[4],lastSet,0]}
       hash2 = {aName => hash1}
       serv_data.push(hash2)
    end
-   # Updates a previous inserted key
+   # Updates a previous inserted key 
    private def updateKey(aName,aDataArray,aValue,i)
-      hash = {aDataArray[1] => [aValue.chop,aDataArray[2],aDataArray[3],aDataArray[4]]}
+      lastSet = Time.now
+      expTime = lastSet - aDataArray[3].to_i*60
+      lastGet = serv_data[i].values[0].values[0][5]
+      hash = {aDataArray[1] => [aValue.chop,aDataArray[2],expTime,aDataArray[4],lastSet,lastGet]}
       serv_data[i].update(serv_data[i]) { |key, value| value = hash }
+   end
+   # Updates last get
+   private def updateLastGet(i)
+      lastGet = Time.now
+      serv_data[i].values[0].values[0][5] = lastGet
    end
    # If reply true returns STORED/NOT_STORED
    #else returns nothing
@@ -138,7 +165,7 @@ class Server
          if stored then
             return 'STORED'
          else
-            return ' NOT_STORED'
+            return 'NOT_STORED'
          end
       end
    end
@@ -146,15 +173,15 @@ end
 #MAIN CLASS
 if __FILE__ == $0
    server = Server.new(1234)
-   con = TCPServer.open(server.serv_port)                   # Socket to listen on port 
+   con = TCPServer.open(server.serv_port)                    
    puts "Listening ..."
-   loop {                                                   # Servers run forever
+   loop {                                                   
       Thread.start(con.accept) do |client| 
          user = client.gets.split
          userName = user[0]
          userPass = user[1]
          if server.serv_password == userPass then
-            while line = client.gets                        # Read lines from the client
+            while line = client.gets                        
                commands = line.split
                case commands[0]
                when 'get'
@@ -164,10 +191,10 @@ if __FILE__ == $0
                      client.puts 'FINISHED'
                   else 
                      client.puts 'CLIENT_ERROR'
+                     client.puts 'FINISHED'
                   end
                when 'gets'
                   result = server.gets(userName,commands)
-                  puts result
                   if result.any? then
                      for i in 0..(result.length - 1)
                         client.puts result[i]
@@ -175,10 +202,9 @@ if __FILE__ == $0
                      client.puts 'END'
                      client.puts 'FINISHED'
                   else
-                     client.puts 'ERROR'
+                     client.puts 'CLIENT_ERROR'
                      client.puts 'FINISHED'
                   end
-                  
                when 'set'
                   value = client.gets 
                   reply = true
@@ -191,6 +217,7 @@ if __FILE__ == $0
                      client.puts 'FINISHED'
                   else 
                      client.puts 'CLIENT_ERROR'
+                     client.puts 'FINISHED'
                   end
                when 'add'
                   value = client.gets 
@@ -204,6 +231,7 @@ if __FILE__ == $0
                      client.puts 'FINISHED'
                   else 
                      client.puts 'CLIENT_ERROR'
+                     client.puts 'FINISHED'
                   end
                when 'replace'
                   value = client.gets 
@@ -217,6 +245,7 @@ if __FILE__ == $0
                      client.puts 'FINISHED'
                   else 
                      client.puts 'CLIENT_ERROR'
+                     client.puts 'FINISHED'
                   end
                when 'append'
                   value = client.gets 
@@ -230,6 +259,7 @@ if __FILE__ == $0
                      client.puts 'FINISHED'
                   else 
                      client.puts 'CLIENT_ERROR'
+                     client.puts 'FINISHED'
                   end
                when 'prepend'
                   value = client.gets 
@@ -243,18 +273,29 @@ if __FILE__ == $0
                      client.puts 'FINISHED'
                   else 
                      client.puts 'CLIENT_ERROR'
+                     client.puts 'FINISHED'
                   end
                when 'cas'
-                  client.puts 'cas'
-               else
-                  client.puts 'CLIENT_ERROR'
+                  value = client.gets 
+                  reply = true
+                  if commands.length == 6 then
+                     reply = !(commands[5] == 'noreply')
+                     server.prepend(userName,commands,value,reply)
+                     client.puts 'FINISHED'
+                  elsif commands.length == 5 then
+                     client.puts server.prepend(userName,commands,value,reply)
+                     client.puts 'FINISHED'
+                  else 
+                     client.puts 'CLIENT_ERROR'
+                     client.puts 'FINISHED'
+                  end
                end
             end
             client.puts "Closing the connection. Bye!"
-            client.close                                    #Disconnect from the client
+            client.close                                    
          else
             client.puts "User o password incorrect! Closing the connection."
-            client.close                                    #Disconnect from the client
+            client.close                                    
          end
       end
    }

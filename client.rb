@@ -32,7 +32,7 @@ if __FILE__ == $0
       case commands[0]
       when 'get','gets'
          s.puts command                            # Send the command to the server
-      when 'set','add','replace','append','prepend'
+      when 'set','add','replace','append','prepend','cas'
          value = gets
          s.puts command                            # Send the command to the server
          s.puts value                              # Send the value to the server
